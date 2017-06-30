@@ -28,6 +28,8 @@ def update_graph_price(optionType, maturity, volatility, change):
     optionPrices_before = BlackScholes(optionType, PRICE_INDEX_DEFAULT, STRIKE_INDEX, maturity,
                                 INTEREST_RATE_DEFAULT, DIVIDEND_YIELD_DEFAULT, volatility)
     optionPrices_after = BlackScholes(optionType, PRICE_INDEX_DEFAULT + change, STRIKE_INDEX,
-                                maturity, INTEREST_RATE_DEFAULT, DIVIDEND_YIELD_DEFAULT, volatility)
-
+                                maturity - 1, INTEREST_RATE_DEFAULT, DIVIDEND_YIELD_DEFAULT, volatility)
+    optionPrices_expiry = BlackScholes_byPrice(optionType, PRICE_INDEX_DEFAULT, strike, 0,
+                                INTEREST_RATE_DEFAULT, DIVIDEND_YIELD_DEFAULT, volatility)
+    scatter_expiry = go.Scatter(x=PRICE_INDEX_DEFAULT, y=optionPrices_expiry.price)
     return {'data': []} # TODO: How to draw a heatmap??

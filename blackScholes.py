@@ -1,6 +1,7 @@
 from scipy.stats import norm
 import numpy as np
 import pandas as pd
+from collections import OrderedDict
 
 def BlackScholes(optionType, stockPrice, strikePrice, timeToMaturity, interestRate, dividendYield, volatility):
     """
@@ -17,7 +18,7 @@ def BlackScholes(optionType, stockPrice, strikePrice, timeToMaturity, interestRa
     Returns:
         float: Theoretical price of the option contract
     """
-    result = {}
+    result = OrderedDict()
     d1_A = np.log(stockPrice / strikePrice)
     d1_B = ((interestRate - dividendYield) / 365.0) + (volatility * volatility / 2.0)
     d1_C = (volatility * np.sqrt(timeToMaturity))
@@ -34,6 +35,9 @@ def BlackScholes(optionType, stockPrice, strikePrice, timeToMaturity, interestRa
 
     result["price"] = c1 - c2
     result["delta"] = norm.cdf(d1)
+    result["gamma"] = 1 / (volatility * stockPrice * np.sqrt(timeToMaturity))
+    result["rho"] = timeToMaturity * c2
+    # TODO: Theta and Vega. They involve I think the derivative of norm.cdf (N') ?
     return result
 
 def BlackScholes_byPrice(optionType, stockPrice, *args):

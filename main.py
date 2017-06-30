@@ -2,9 +2,9 @@ import dash
 from dash.dependencies import Input, Output
 import dash_core_components as dcc
 import dash_html_components as html
-import datetime
 import numpy as np
 import plotly.graph_objs as go
+from plotly import tools
 
 from googlefinance import getQuotes
 
@@ -16,9 +16,9 @@ TICKER_DEFAULT = 'AAPL'
 # TODO: This is expensive loading. What's the best way to handle this? A button?
 #QUOTE_DEFAULT = getQuotes(TICKER_DEFAULT)[0]
 PRICE_DEFAULT = 150.00 #float(QUOTE_DEFAULT["LastTradePrice"])
-PRICE_INDEX_RESOLUTION_DEFAULT = 20
+PRICE_INDEX_RESOLUTION_DEFAULT = 100
 PRICE_INDEX_DEFAULT = np.linspace(
-    PRICE_DEFAULT * 0.75, PRICE_DEFAULT * 1.25, num=PRICE_INDEX_RESOLUTION_DEFAULT)
+    PRICE_DEFAULT * 0.5, PRICE_DEFAULT * 1.5, num=PRICE_INDEX_RESOLUTION_DEFAULT)
 # TODO: Load the Risk-Free Interest Rate From the US T-Bill
 INTEREST_RATE_DEFAULT = 0.03
 # TODO: Load the current security's dividend yield. This will likely be an expensive load.
@@ -34,7 +34,7 @@ STRIKE_DEFAULT = (STRIKE_MAX + STRIKE_MIN) / 2.0
 STRIKE_STEP = 0.5
 STRIKE_INDEX = np.arange(STRIKE_MIN, STRIKE_MAX, STRIKE_STEP)
 MATURITY_MIN = 0.0
-MATURITY_MAX = 365.0
+MATURITY_MAX = 30.0
 MATURITY_DEFAULT = 5.0
 VOLATILITY_MAX = 1.0
 VOLATILITY_STEP = 0.01
@@ -43,7 +43,7 @@ VOLATILITY_DEFAULT = 0.05
 
 # --------------------------------------------------------------------------------------------------
 # Create Labels and Controls
-PAGE_HEADER = html.Div(children="Ticker: {} Price: {}".format(TICKER_DEFAULT, PRICE_DEFAULT))
+PAGE_HEADER = html.Div(children="Ticker: {} Price: ${}".format(TICKER_DEFAULT, PRICE_DEFAULT))
 OPTION_TYPE_CONTROL = dcc.Dropdown(id='combo-optionType',
              options=[{'label': i, 'value': i} for i in OPTION_TYPES],
              value=OPTION_DEFAULT)
@@ -77,13 +77,13 @@ app.layout = html.Div([
 # Label Update Callbacks
 @app.callback(Output('label-strike', 'children'), [Input('slider-strike', 'value')])
 def update_strike(strike):
-    return "Strike: {}".format(strike)
+    return "Strike: ${}".format(strike)
 @app.callback(Output('label-maturity', 'children'), [Input('slider-maturity', 'value')])
 def update_maturity(maturity):
-    return "Maturity: {}".format(maturity)
+    return "Time to Maturity: {} days".format(maturity)
 @app.callback(Output('label-volatility', 'children'), [Input('slider-volatility', 'value')])
 def update_volatility(volatility):
-    return "Volatility: {}".format(volatility)
+    return "Volatility: {} %".format(volatility * 100)
 
 # --------------------------------------------------------------------------------------------------
 # Price Graph Callback
@@ -96,13 +96,13 @@ def update_volatility(volatility):
 def update_graph_price(optionType, strike, maturity, volatility):
     optionPrices_today = BlackScholes_byPrice(optionType, PRICE_INDEX_DEFAULT, strike, maturity,
                                 INTEREST_RATE_DEFAULT, DIVIDEND_YIELD_DEFAULT, volatility)
-    optionPrices_expiry = BlackScholes_byPrice(optionType, PRICE_INDEX_DEFAULT, strike, 0,
-                                INTEREST_RATE_DEFAULT, DIVIDEND_YIELD_DEFAULT, volatility)
+    scatters = [ go.Scatter(x=PRICE_INDEX_DEFAULT, y=optionPrices_today[column], name=column)
+                            for column in optionPrices_today.columns ]
+    fig = tools.make_subplots(rows=len(scatters), cols=1, shared_xaxes=True)
+    for i in range(len(scatters)):
+        fig.append_trace(scatters[i], i + 1, 1)
 
-    return {'data': [
-        go.Scatter(x=PRICE_INDEX_DEFAULT, y=optionPrices_today.price),
-        go.Scatter(x=PRICE_INDEX_DEFAULT, y=optionPrices_expiry.price),
-    ]}
+    return fig
 
 # --------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
