@@ -1,7 +1,11 @@
 import pytest
 import time
 import numpy as np
-from blackScholes import BlackScholes
+import pandas as pd
+
+#Project-level imports
+from blackScholes import BlackScholes_byPrice
+
 
 @pytest.fixture(scope='function', params=[25, 50, 100, 500, 1000])
 def sample_price(request):
@@ -16,4 +20,5 @@ def sample_price(request):
     return data
 
 def test_BlackScholes(sample_price):
-    prices = BlackScholes('c', sample_price, 100, 0.005, 0.06, 0, 0.4)
+    prices = BlackScholes_byPrice('c', sample_price, 100, 0.005, 0.06, 0, 0.4)
+    print(prices)
