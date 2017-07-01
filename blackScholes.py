@@ -19,15 +19,15 @@ def BlackScholes(optionType, stockPrice, strikePrice, timeToMaturity, interestRa
         float: Theoretical price of the option contract
     """
     result = OrderedDict()
-    d1_A = np.log(stockPrice / strikePrice)
+    d1_A = np.log(np.outer(stockPrice, 1 / strikePrice))
     d1_B = ((interestRate - dividendYield) / 365.0) + (volatility * volatility / 2.0)
     d1_C = (volatility * np.sqrt(timeToMaturity))
     d1 = (d1_A + d1_B * timeToMaturity) / d1_C
-    d2 = d1 - volatility * np.sqrt(timeToMaturity)
+    d2 = d1 - d1_C
     if 'p' in optionType.lower():
         d1 = -d1
         d2 = -d2
-    c1 = stockPrice * norm.cdf(d1)
+    c1 = np.transpose(stockPrice * np.transpose(norm.cdf(d1)))
     c2 = strikePrice * np.exp(-interestRate * timeToMaturity / 365.0) * norm.cdf(d2)
     if 'p' in optionType.lower():
         c1 = -c1
@@ -42,3 +42,10 @@ def BlackScholes(optionType, stockPrice, strikePrice, timeToMaturity, interestRa
 
 def BlackScholes_byPrice(optionType, stockPrice, *args):
     return pd.DataFrame(BlackScholes(optionType, stockPrice, *args), index=stockPrice)
+
+def BlackScholes_byStrikeAndPrice(optionType, stockPrice, strikePrice, *args):
+    data = BlackScholes(optionType, stockPrice, strikePrice, *args)
+    return pd.Panel(data,
+                    items=["price", "delta", "gamma", "rho"],
+                    major_axis=stockPrice,
+                    minor_axis=strikePrice)
