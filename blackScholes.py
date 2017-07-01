@@ -8,15 +8,15 @@ def BlackScholes(optionType, stockPrice, strikePrice, timeToMaturity, interestRa
     The Black Scholes Formula
     Args:
         optionType(str): "call" or "put"
-        stockPrice(float): Current stock price in $
-        strikePrice(float): Strike price of the contract in $
+        stockPrice(float or ndarray): Current stock price in $
+        strikePrice(float or ndarray): Strike price of the contract in $
         timeToMaturity(float): Number of days until maturity
         interestRate(float): The risk-free interest rate.
         dividendYield (float): Annualized dividend yield of underlying.
         volatility(float): Daily volatility of the underlying
 
     Returns:
-        float: Theoretical price of the option contract
+        float or ndarray: Theoretical price of the option contract
     """
     result = OrderedDict()
     d1_A = np.log(np.outer(stockPrice, 1 / strikePrice))

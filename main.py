@@ -14,8 +14,8 @@ from blackScholes import BlackScholes_byPrice
 # Global Defaults
 TICKER_DEFAULT = 'AAPL'
 # TODO: This is expensive loading. What's the best way to handle this? A button?
-#QUOTE_DEFAULT = getQuotes(TICKER_DEFAULT)[0]
-PRICE_DEFAULT = 150.00 #float(QUOTE_DEFAULT["LastTradePrice"])
+QUOTE_DEFAULT = getQuotes(TICKER_DEFAULT)[0]
+PRICE_DEFAULT = float(QUOTE_DEFAULT["LastTradePrice"])
 PRICE_INDEX_RESOLUTION_DEFAULT = 100
 PRICE_INDEX_DEFAULT = np.linspace(
     PRICE_DEFAULT * 0.5, PRICE_DEFAULT * 1.5, num=PRICE_INDEX_RESOLUTION_DEFAULT)
