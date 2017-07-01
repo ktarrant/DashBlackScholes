@@ -20,6 +20,9 @@ def BlackScholes(optionType, stockPrice, strikePrice, timeToMaturity, interestRa
     """
     result = OrderedDict()
     d1_A = np.log(np.outer(stockPrice, 1 / strikePrice))
+    # TODO: Is there a cleaner/safer/better way to take off the extra dimension if it is 1?
+    if d1_A.shape[1] == 1:
+        d1_A = d1_A[:, 0]
     d1_B = ((interestRate - dividendYield) / 365.0) + (volatility * volatility / 2.0)
     d1_C = (volatility * np.sqrt(timeToMaturity))
     d1 = (d1_A + d1_B * timeToMaturity) / d1_C
@@ -41,7 +44,8 @@ def BlackScholes(optionType, stockPrice, strikePrice, timeToMaturity, interestRa
     return result
 
 def BlackScholes_byPrice(optionType, stockPrice, *args):
-    return pd.DataFrame(BlackScholes(optionType, stockPrice, *args), index=stockPrice)
+    data = BlackScholes(optionType, stockPrice, *args)
+    return pd.DataFrame(data, index=stockPrice)
 
 def BlackScholes_byStrikeAndPrice(optionType, stockPrice, strikePrice, *args):
     data = BlackScholes(optionType, stockPrice, strikePrice, *args)
