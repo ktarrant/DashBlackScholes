@@ -5,24 +5,77 @@ import dash_html_components as html
 import numpy as np
 import plotly.graph_objs as go
 from plotly import tools
-
-from googlefinance import getQuotes
+import datetime
+import pandas as pd
+import urllib.request
 
 from blackScholes import BlackScholes_byPrice
 
+def data_convert(e):
+    cleaned = e.strip()
+    try:
+        return float(cleaned)
+    except ValueError:
+        try:
+            return datetime.datetime.strptime(cleaned, "%d-%b-%y")
+        except ValueError:
+            return cleaned
+
+def get_google_data(ticker):
+    """ Retrieves a years worth of daily data for the given ticker """
+    base = "http://www.google.com/finance/historical?"
+    params = [
+        ("q", ticker),
+        ("output", "csv"),
+    ]
+    url = base + "&".join(["{}={}".format(key, value) for (key, value) in params])
+    url = url.replace(" ", "%20")
+    with urllib.request.urlopen(url) as webobj:
+        contents = webobj.read().decode('utf8')
+        data = [[e for e in line.split(u",")] for line in contents.split(u"\n")]
+        header = [e.strip().strip('\ufeff') for e in data.pop(0)]
+        df = pd.DataFrame(data, columns=header).dropna(how='any').applymap(data_convert)
+        return df
+
+def rolling_apply_left(obj, *args, **kwargs):
+    return pd.rolling_apply(obj.iloc[::-1], *args, **kwargs).iloc[::-1]
+
+def historical_volatility(returns):
+    avg_return = returns.mean()
+    return_diff = returns - avg_return
+    return np.sqrt((return_diff * return_diff).sum() / (len(returns) - 1))
+
 # --------------------------------------------------------------------------------------------------
 # Global Defaults
-TICKER_DEFAULT = 'AAPL'
-# TODO: This is expensive loading. What's the best way to handle this? A button?
-QUOTE_DEFAULT = getQuotes(TICKER_DEFAULT)[0]
-PRICE_DEFAULT = float(QUOTE_DEFAULT["LastTradePrice"])
+TICKER_DEFAULT = 'NFLX'
+HISTORY_DATA = get_google_data(TICKER_DEFAULT).set_index("Date")
+HISTORY_WINDOW = 30
+HISTORICAL_RETURN = np.log(HISTORY_DATA.Close[:-1] / HISTORY_DATA.Close.shift(-1).dropna())
+HISTORICAL_VOLATILITY_ADJUSEMENT = 1 # we want the daily volatility for our computations
+HISTORICAL_ROLLING_VOLATILITY = (
+    rolling_apply_left(HISTORICAL_RETURN, HISTORY_WINDOW, historical_volatility)
+    * HISTORICAL_VOLATILITY_ADJUSEMENT)
+HISTORICAL_VOLATILITY = HISTORICAL_ROLLING_VOLATILITY.iloc[0]
+HISTORICAL_VOLATILITY_LOW = HISTORICAL_ROLLING_VOLATILITY.min()
+HISTORICAL_VOLATILITY_HIGH = HISTORICAL_ROLLING_VOLATILITY.max()
+PRICE_DEFAULT = HISTORY_DATA.Close.iloc[0]
 PRICE_INDEX_RESOLUTION_DEFAULT = 100
 PRICE_INDEX_DEFAULT = np.linspace(
-    PRICE_DEFAULT * 0.5, PRICE_DEFAULT * 1.5, num=PRICE_INDEX_RESOLUTION_DEFAULT)
+    PRICE_DEFAULT * (1 + HISTORICAL_VOLATILITY),
+    PRICE_DEFAULT * (1 - HISTORICAL_VOLATILITY),
+    num=PRICE_INDEX_RESOLUTION_DEFAULT)
 # TODO: Load the Risk-Free Interest Rate From the US T-Bill
 INTEREST_RATE_DEFAULT = 0.03
 # TODO: Load the current security's dividend yield. This will likely be an expensive load.
 DIVIDEND_YIELD_DEFAULT = 0
+
+def toHVRank(hv):
+    range = HISTORICAL_VOLATILITY_HIGH - HISTORICAL_VOLATILITY_LOW
+    return (hv - HISTORICAL_VOLATILITY_LOW) / range * 100.0
+
+def fromHVRank(rank):
+    range = HISTORICAL_VOLATILITY_HIGH - HISTORICAL_VOLATILITY_LOW
+    return (rank / 100.0) * range + HISTORICAL_VOLATILITY_LOW
 
 # --------------------------------------------------------------------------------------------------
 # Controllable ranges
@@ -36,14 +89,33 @@ STRIKE_INDEX = np.arange(STRIKE_MIN, STRIKE_MAX, STRIKE_STEP)
 MATURITY_MIN = 0.0
 MATURITY_MAX = 30.0
 MATURITY_DEFAULT = 5.0
-VOLATILITY_MAX = 1.0
-VOLATILITY_STEP = 0.01
-VOLATILITY_MIN = VOLATILITY_STEP
-VOLATILITY_DEFAULT = 0.05
+VOLATILITY_MAX = HISTORICAL_VOLATILITY_HIGH
+VOLATILITY_MIN = HISTORICAL_VOLATILITY_LOW
+VOLATILITY_STEP = (HISTORICAL_VOLATILITY_HIGH - HISTORICAL_VOLATILITY_LOW) / 100.0
+VOLATILITY_DEFAULT = HISTORICAL_VOLATILITY
+
+# --------------------------------------------------------------------------------------------------
+# Static objects
+PAGE_HEADER = html.Div(children="Ticker: {} Price: ${}".format(TICKER_DEFAULT, PRICE_DEFAULT))
+HISTORY_FIGURE = tools.make_subplots(2, 1, shared_xaxes=True)
+HISTORY_FIGURE.append_trace(go.Scatter(x=HISTORY_DATA.index, y=HISTORY_DATA.Close, name='price'),
+                            1, 1)
+HISTORY_FIGURE.append_trace(go.Scatter(x=HISTORICAL_ROLLING_VOLATILITY.index,
+                                       y=HISTORICAL_ROLLING_VOLATILITY,
+                                       name='daily volatility'), 2, 1)
+HISTORY_GRAPH = dcc.Graph(id='graph-history', figure=HISTORY_FIGURE)
+HV_PREAMBLE_LABEL = html.Div(children="Note: Historical Volatility figures are DAILY volatility")
+HV_CURRENT_LABEL = html.Div(children="Historical ({}-day) Volatility: {}%".format(
+    HISTORY_WINDOW, HISTORICAL_VOLATILITY * 100.0))
+HV_LOW_LABEL = html.Div(children="Historical Volatility 52-week Low: {}%".format(
+    HISTORICAL_ROLLING_VOLATILITY.min() * 100.0))
+HV_HIGH_LABEL = html.Div(children="Historical Volatility 52-week High: {}%".format(
+    HISTORICAL_ROLLING_VOLATILITY.max() * 100.0))
+HV_RANK_LABEL = html.Div(children="Historical Volatility Rank: {}".format(
+    toHVRank(HISTORICAL_VOLATILITY)))
 
 # --------------------------------------------------------------------------------------------------
 # Create Labels and Controls
-PAGE_HEADER = html.Div(children="Ticker: {} Price: ${}".format(TICKER_DEFAULT, PRICE_DEFAULT))
 OPTION_TYPE_CONTROL = dcc.Dropdown(id='combo-optionType',
              options=[{'label': i, 'value': i} for i in OPTION_TYPES],
              value=OPTION_DEFAULT)
@@ -63,6 +135,12 @@ VOLATILITY_CONTROL = dcc.Slider(id='slider-volatility',
 app = dash.Dash()
 app.layout = html.Div([
     PAGE_HEADER,
+    HISTORY_GRAPH,
+    HV_PREAMBLE_LABEL,
+    HV_CURRENT_LABEL,
+    HV_LOW_LABEL,
+    HV_HIGH_LABEL,
+    HV_RANK_LABEL,
     OPTION_TYPE_CONTROL,
     STRIKE_LABEL,
     STRIKE_CONTROL,
@@ -83,7 +161,7 @@ def update_maturity(maturity):
     return "Time to Maturity: {} days".format(maturity)
 @app.callback(Output('label-volatility', 'children'), [Input('slider-volatility', 'value')])
 def update_volatility(volatility):
-    return "Volatility: {} %".format(volatility * 100)
+    return "Daily Volatility: {} %".format(volatility * 100)
 
 # --------------------------------------------------------------------------------------------------
 # Price Graph Callback
