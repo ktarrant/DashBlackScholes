@@ -38,7 +38,10 @@ def BlackScholes(optionType, stockPrice, strikePrice, timeToMaturity, interestRa
 
     result["price"] = c1 - c2
     result["delta"] = norm.cdf(d1)
-    result["gamma"] = 1 / (volatility * stockPrice * np.sqrt(timeToMaturity))
+    try:
+        result["gamma"] = 1 / (volatility * stockPrice * np.sqrt(timeToMaturity))
+    except ZeroDivisionError:
+        result["gamme"] = pd.NaN
     result["rho"] = timeToMaturity * c2
     # TODO: Theta and Vega. They involve I think the derivative of norm.cdf (N') ?
     return result

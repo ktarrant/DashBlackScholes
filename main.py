@@ -96,11 +96,23 @@ def update_volatility(volatility):
 def update_graph_price(optionType, strike, maturity, volatility):
     optionPrices_today = BlackScholes_byPrice(optionType, PRICE_INDEX_DEFAULT, strike, maturity,
                                 INTEREST_RATE_DEFAULT, DIVIDEND_YIELD_DEFAULT, volatility)
-    scatters = [ go.Scatter(x=PRICE_INDEX_DEFAULT, y=optionPrices_today[column], name=column)
+    optionPrices_expiry = BlackScholes_byPrice(optionType, PRICE_INDEX_DEFAULT, strike, 0,
+                                INTEREST_RATE_DEFAULT, DIVIDEND_YIELD_DEFAULT, 0)
+
+    scatters_today = [ go.Scatter(x=PRICE_INDEX_DEFAULT, y=optionPrices_today[column],
+                                  name="{}_{}".format(column, 'today'))
                             for column in optionPrices_today.columns ]
-    fig = tools.make_subplots(rows=len(scatters), cols=1, shared_xaxes=True)
-    for i in range(len(scatters)):
-        fig.append_trace(scatters[i], i + 1, 1)
+    scatters_expiry = {column: go.Scatter(x=PRICE_INDEX_DEFAULT, y=optionPrices_expiry[column],
+                                  name="{}_{}".format(column, 'expiry'))
+                      for column in optionPrices_expiry.columns}
+    fig = tools.make_subplots(rows=len(scatters_today), cols=1, shared_xaxes=True)
+    for i in range(len(scatters_today)):
+        fig.append_trace(scatters_today[i], i + 1, 1)
+
+    # be selective with with expiry ones we use
+    fig.append_trace(scatters_expiry['price'], 1, 1)
+    fig.append_trace(scatters_expiry['delta'], 2, 1)
+
 
     return fig
 
