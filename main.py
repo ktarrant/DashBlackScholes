@@ -51,10 +51,8 @@ TICKER_DEFAULT = 'NFLX'
 HISTORY_DATA = get_google_data(TICKER_DEFAULT).set_index("Date")
 HISTORY_WINDOW = 30
 HISTORICAL_RETURN = np.log(HISTORY_DATA.Close[:-1] / HISTORY_DATA.Close.shift(-1).dropna())
-HISTORICAL_VOLATILITY_ADJUSEMENT = 1 # we want the daily volatility for our computations
 HISTORICAL_ROLLING_VOLATILITY = (
-    rolling_apply_left(HISTORICAL_RETURN, HISTORY_WINDOW, historical_volatility)
-    * HISTORICAL_VOLATILITY_ADJUSEMENT)
+    rolling_apply_left(HISTORICAL_RETURN, HISTORY_WINDOW, historical_volatility))
 HISTORICAL_VOLATILITY = HISTORICAL_ROLLING_VOLATILITY.iloc[0]
 HISTORICAL_VOLATILITY_LOW = HISTORICAL_ROLLING_VOLATILITY.min()
 HISTORICAL_VOLATILITY_HIGH = HISTORICAL_ROLLING_VOLATILITY.max()
@@ -104,13 +102,15 @@ HISTORY_FIGURE.append_trace(go.Scatter(x=HISTORICAL_ROLLING_VOLATILITY.index,
                                        y=HISTORICAL_ROLLING_VOLATILITY,
                                        name='daily volatility'), 2, 1)
 HISTORY_GRAPH = dcc.Graph(id='graph-history', figure=HISTORY_FIGURE)
-HV_PREAMBLE_LABEL = html.Div(children="Note: Historical Volatility figures are DAILY volatility")
+HV_PREAMBLE_LABEL = html.Div(children=
+    "Note: These Historical Volatility figures are adjusted to yearly values for easy comps.")
+HISTORICAL_VOLATILITY_ADJUSEMENT = np.sqrt(252)
 HV_CURRENT_LABEL = html.Div(children="Historical ({}-day) Volatility: {}%".format(
-    HISTORY_WINDOW, HISTORICAL_VOLATILITY * 100.0))
+    HISTORY_WINDOW, HISTORICAL_VOLATILITY * 100.0 * HISTORICAL_VOLATILITY_ADJUSEMENT))
 HV_LOW_LABEL = html.Div(children="Historical Volatility 52-week Low: {}%".format(
-    HISTORICAL_ROLLING_VOLATILITY.min() * 100.0))
+    HISTORICAL_ROLLING_VOLATILITY.min() * 100.0 * HISTORICAL_VOLATILITY_ADJUSEMENT))
 HV_HIGH_LABEL = html.Div(children="Historical Volatility 52-week High: {}%".format(
-    HISTORICAL_ROLLING_VOLATILITY.max() * 100.0))
+    HISTORICAL_ROLLING_VOLATILITY.max() * 100.0 * HISTORICAL_VOLATILITY_ADJUSEMENT))
 HV_RANK_LABEL = html.Div(children="Historical Volatility Rank: {}".format(
     toHVRank(HISTORICAL_VOLATILITY)))
 
